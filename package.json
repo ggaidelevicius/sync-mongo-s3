@@ -1,0 +1,60 @@
+{
+  "name": "@ggaidelevicius/sync-mongo-s3",
+  "version": "0.0.0",
+  "description": "CLI for dumping a remote MongoDB, restoring it locally, and syncing an S3 bucket into ./s3-bucket.",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "sync-mongo-s3": "./dist/index.js"
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "pnpm clean && tsc --outDir dist --rootDir src",
+    "check": "pnpm typecheck",
+    "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "hooks:install": "git config core.hooksPath .githooks",
+    "prepack": "pnpm build",
+    "test": "pnpm check && pnpm build",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "mongodb": "^7.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.4.0",
+    "prettier": "^3.8.1",
+    "typescript": "^5.9.3"
+  },
+  "engines": {
+    "node": ">=20.9.0",
+    "pnpm": "^9 || ^10"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ggaidelevicius/sync-mongo-s3.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ggaidelevicius/sync-mongo-s3/issues"
+  },
+  "homepage": "https://github.com/ggaidelevicius/sync-mongo-s3#readme",
+  "keywords": [
+    "mongodb",
+    "mongodump",
+    "mongorestore",
+    "s3",
+    "aws",
+    "cli",
+    "backup",
+    "restore"
+  ],
+  "author": "Gus Gaidelevicius"
+}
