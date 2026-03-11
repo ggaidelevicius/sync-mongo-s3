@@ -1,16 +1,14 @@
 # @ggaidelevicius/sync-mongo-s3
 
-CLI for:
+A CLI for pulling your remote production environment down to local. It dumps a remote MongoDB database and restores it locally, and syncs an S3 bucket (or prefix) into `./s3-bucket` — all in one command.
 
-- dumping a remote MongoDB database with `mongodump`
-- restoring it into a local MongoDB database with `mongorestore`
-- syncing an S3 bucket or prefix into `./s3-bucket`
+Useful when you want to develop against real data without manually wrangling `mongodump`, `mongorestore`, and the AWS CLI every time.
 
 ## Requirements
 
 - Node `>=20.9.0`
-- AWS CLI installed and already authenticated
-- MongoDB Database Tools installed (`mongodump`, `mongorestore`)
+- [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) installed and authenticated
+- [MongoDB Database Tools](https://www.mongodb.com/docs/database-tools/installation/installation/) installed (`mongodump`, `mongorestore`)
 
 ## Install
 
@@ -18,11 +16,30 @@ CLI for:
 pnpm add -D @ggaidelevicius/sync-mongo-s3
 ```
 
-or run it without installing:
+or run without installing:
 
 ```bash
 pnpm dlx @ggaidelevicius/sync-mongo-s3 --help
+# or
+npx @ggaidelevicius/sync-mongo-s3 --help
 ```
+
+## Quick start
+
+1. Add your connection URIs to your `.env` file (or let `--init` scaffold them):
+
+```bash
+SYNC_REMOTE_MONGO_URI=mongodb+srv://user:pass@cluster.example.com/
+SYNC_LOCAL_MONGO_URI=mongodb://127.0.0.1/
+```
+
+2. Run the CLI — it will prompt for anything else it needs:
+
+```bash
+sync-mongo-s3
+```
+
+That's it. The CLI discovers available databases and S3 buckets interactively, so you don't need to configure everything upfront.
 
 ## Usage
 
@@ -30,20 +47,22 @@ pnpm dlx @ggaidelevicius/sync-mongo-s3 --help
 sync-mongo-s3
 ```
 
-The CLI prompts interactively when values are missing and tries to list:
+When values are missing, the CLI prompts interactively and tries to list:
 
 - remote Mongo databases
 - local Mongo databases
 - available S3 buckets
 - top-level S3 prefixes
 
-On first run, the CLI checks the project’s `.env*` files for the minimum `SYNC_*` setup. Right now that is just the remote and local Mongo URI placeholders. If they are missing, it offers to add them to the most relevant env file, tells you exactly what it wrote, and stops so you can fill in your own values.
+On first run, the CLI checks your project's `.env*` files for the minimum `SYNC_*` setup. If the URI placeholders are missing, it offers to add them to the most relevant env file, tells you exactly what it wrote, and stops so you can fill in your own values.
 
-Useful modes:
+### Flags
 
-- `sync-mongo-s3 --init` scaffolds the minimum `SYNC_*` placeholders
-- `sync-mongo-s3 --check` validates config, tooling, auth, and discovery without syncing
-- `sync-mongo-s3 --dry-run` prints the resolved sync plan and commands without executing them
+- `--init` — scaffold the minimum `SYNC_*` placeholders into your env file
+- `--check` — validate config, tooling, auth, and discovery without syncing
+- `--dry-run` — print the resolved sync plan and commands without executing them
+- `--skip-s3` — skip the S3 sync, only run the Mongo dump/restore
+- `--skip-mongo` — skip the Mongo dump/restore, only run the S3 sync
 
 ### Common examples
 
@@ -59,30 +78,30 @@ sync-mongo-s3 --remote-uri "mongodb+srv://..." --remote-db production --local-ur
 
 ## Environment variables
 
-Preferred env vars:
+| Variable | Required | Description |
+|---|---|---|
+| `SYNC_REMOTE_MONGO_URI` | Yes | Connection string for the remote MongoDB |
+| `SYNC_LOCAL_MONGO_URI` | Yes | Connection string for your local MongoDB |
+| `SYNC_REMOTE_MONGO_DB` | No | Remote database name (prompted if omitted) |
+| `SYNC_LOCAL_MONGO_DB` | No | Local database name (prompted if omitted) |
+| `SYNC_S3_BUCKET` | No | S3 bucket to sync (prompted if omitted) |
+| `SYNC_S3_PREFIX` | No | S3 prefix/folder within the bucket |
+| `SYNC_AWS_REGION` | No | AWS region override |
+| `SYNC_MEDIA_URL_REWRITE_HOST` | No | See [Media URL rewriting](#media-url-rewriting) |
+| `SYNC_MEDIA_URL_REWRITE_DROP_FIRST_SEGMENT` | No | See [Media URL rewriting](#media-url-rewriting) |
 
-- `SYNC_REMOTE_MONGO_URI`
-- `SYNC_REMOTE_MONGO_DB`
-- `SYNC_LOCAL_MONGO_URI`
-- `SYNC_LOCAL_MONGO_DB`
-- `SYNC_S3_BUCKET`
-- `SYNC_S3_PREFIX`
-- `SYNC_AWS_REGION`
-- `SYNC_MEDIA_URL_REWRITE_HOST`
-- `SYNC_MEDIA_URL_REWRITE_DROP_FIRST_SEGMENT`
-
-Only `SYNC_REMOTE_MONGO_URI` and `SYNC_LOCAL_MONGO_URI` are scaffolded during first-run initialization. The rest are optional shortcuts; the CLI can prompt for database and bucket selection interactively.
+Only `SYNC_REMOTE_MONGO_URI` and `SYNC_LOCAL_MONGO_URI` are required. Everything else is an optional shortcut — the CLI will prompt interactively for anything missing.
 
 ## Media URL rewriting
 
-If you want restored Mongo documents to rewrite absolute media URLs to local `/s3-bucket/...` paths, configure:
+If your production Mongo documents store absolute CDN URLs (e.g. `https://cdn.example.com/media/image.jpg`) and you want them rewritten to point at your local `./s3-bucket` after restore, configure:
 
 ```bash
 SYNC_MEDIA_URL_REWRITE_HOST=cdn.example.com
-SYNC_MEDIA_URL_REWRITE_DROP_FIRST_SEGMENT=true
+SYNC_MEDIA_URL_REWRITE_DROP_FIRST_SEGMENT=true  # drops /media, leaving /image.jpg
 ```
 
-or use:
+or pass them as flags:
 
 ```bash
 sync-mongo-s3 \
@@ -90,19 +109,4 @@ sync-mongo-s3 \
   --rewrite-media-drop-first-segment
 ```
 
-This is useful when production documents store absolute CDN URLs but local development should serve files from the synced `./s3-bucket` directory.
-
-## Release flow
-
-This repo includes the same basic publish scaffolding as `payload-isr`:
-
-- GitHub release workflow on `main`
-- commit message release markers
-- issue templates
-- pull request template
-
-Release commits should include exactly one of:
-
-- `(release:patch)`
-- `(release:minor)`
-- `(release:major)`
+`--rewrite-media-drop-first-segment` strips the first path segment from the URL before mapping it to `./s3-bucket`. Useful when your CDN path includes a prefix (e.g. `/media/`) that doesn't exist in your local bucket directory.
