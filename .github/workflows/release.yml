@@ -46,6 +46,12 @@ jobs:
       - name: Run full test suite
         run: pnpm test
 
+      - name: Verify publish contents
+        run: |
+          PACK_OUTPUT="$(pnpm pack --dry-run)"
+          echo "$PACK_OUTPUT"
+          echo "$PACK_OUTPUT" | grep -q 'README.md'
+
       - name: Select semver bump
         id: bump
         run: |
