@@ -5,7 +5,7 @@
   "license": "MIT",
   "type": "module",
   "bin": {
-    "sync-mongo-s3": "./dist/index.js"
+    "sync-mongo-s3": "dist/index.js"
   },
   "files": [
     "dist",
