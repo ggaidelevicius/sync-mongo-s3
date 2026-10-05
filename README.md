@@ -6,7 +6,7 @@ Useful when you want to develop against real data without manually wrangling `mo
 
 ## Requirements
 
-- Node `>=20.9.0`
+- Node `>=20.19.0`
 - [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) installed and authenticated
 - [MongoDB Database Tools](https://www.mongodb.com/docs/database-tools/installation/installation/) installed (`mongodump`, `mongorestore`)
 
@@ -54,15 +54,22 @@ When values are missing, the CLI prompts interactively and tries to list:
 - available S3 buckets
 - top-level S3 prefixes
 
-On first run, the CLI checks your project's `.env*` files for the minimum `SYNC_*` setup. If the URI placeholders are missing, it offers to add them to the most relevant env file, tells you exactly what it wrote, and stops so you can fill in your own values.
+Connection settings can come from flags, exported environment variables, or development env files. No env file is required. Flags take precedence over the environment; existing environment values take precedence over files. Files are loaded in this order: `.env.local`, `.env.development.local`, `.env.development`, and `.env`. An empty value also takes precedence over lower-priority files. Production, test, and example env files are not loaded automatically. Quoted values, `export`, and inline comments follow [Node's dotenv syntax](https://nodejs.org/api/environment_variables.html#dotenv).
+
+When a normal interactive MongoDB sync is missing connection settings, the CLI can offer to add missing URI placeholders to the highest-priority existing env file, or `.env.local` if none exists. It then stops so you can fill them in. Explicit `--init` writes missing placeholders without prompting, including outside a terminal, and leaves existing values intact. `--check` and `--dry-run` never scaffold files or prompt.
 
 ### Flags
 
 - `--init` — scaffold the minimum `SYNC_*` placeholders into your env file
-- `--check` — validate config, tooling, auth, and discovery without syncing
-- `--dry-run` — print the resolved sync plan and commands without executing them
+- `--check` — validate config, tooling, MongoDB discovery, and access to the selected S3 bucket/prefix without syncing; a new local database is allowed
+- `--dry-run` — print the resolved sync plan and commands without contacting services or requiring external tools
 - `--skip-s3` — skip the S3 sync, only run the Mongo dump/restore
-- `--skip-mongo` — skip the Mongo dump/restore, only run the S3 sync
+- `--skip-mongo` — skip the Mongo dump/restore, only run the S3 sync; MongoDB settings are not required
+- `--interactive` — prompt even when settings are already configured
+- `--keep-dump` — retain the temporary dump after success or failure
+- `--temp-dir <path>` — use a specific base directory for the temporary dump
+
+Use only one of `--init`, `--check`, or `--dry-run`. Run `sync-mongo-s3 --help` for all connection and media flags.
 
 ### Common examples
 
@@ -78,19 +85,21 @@ sync-mongo-s3 --remote-uri "mongodb+srv://..." --remote-db production --local-ur
 
 ## Environment variables
 
-| Variable | Required | Description |
-|---|---|---|
-| `SYNC_REMOTE_MONGO_URI` | Yes | Connection string for the remote MongoDB |
-| `SYNC_LOCAL_MONGO_URI` | Yes | Connection string for your local MongoDB |
-| `SYNC_REMOTE_MONGO_DB` | No | Remote database name (prompted if omitted) |
-| `SYNC_LOCAL_MONGO_DB` | No | Local database name (prompted if omitted) |
-| `SYNC_S3_BUCKET` | No | S3 bucket to sync (prompted if omitted) |
-| `SYNC_S3_PREFIX` | No | S3 prefix/folder within the bucket |
-| `SYNC_AWS_REGION` | No | AWS region override |
-| `SYNC_MEDIA_URL_REWRITE_HOST` | No | See [Media URL rewriting](#media-url-rewriting) |
-| `SYNC_MEDIA_URL_REWRITE_DROP_FIRST_SEGMENT` | No | See [Media URL rewriting](#media-url-rewriting) |
+| Variable                                    | Required | Description                                     |
+| ------------------------------------------- | -------- | ----------------------------------------------- |
+| `SYNC_REMOTE_MONGO_URI`                     | Yes      | Connection string for the remote MongoDB        |
+| `SYNC_LOCAL_MONGO_URI`                      | Yes      | Connection string for your local MongoDB        |
+| `SYNC_REMOTE_MONGO_DB`                      | No       | Remote database name (prompted if omitted)      |
+| `SYNC_LOCAL_MONGO_DB`                       | No       | Local database name (prompted if omitted)       |
+| `SYNC_S3_BUCKET`                            | No       | S3 bucket to sync (prompted if omitted)         |
+| `SYNC_S3_PREFIX`                            | No       | S3 prefix/folder within the bucket              |
+| `SYNC_AWS_REGION`                           | No       | AWS region override                             |
+| `SYNC_MEDIA_URL_REWRITE_HOST`               | No       | See [Media URL rewriting](#media-url-rewriting) |
+| `SYNC_MEDIA_URL_REWRITE_DROP_FIRST_SEGMENT` | No       | See [Media URL rewriting](#media-url-rewriting) |
 
-Only `SYNC_REMOTE_MONGO_URI` and `SYNC_LOCAL_MONGO_URI` are required. Everything else is an optional shortcut — the CLI will prompt interactively for anything missing.
+MongoDB URIs are required only when MongoDB syncing is enabled. The remote database comes from `--remote-db`, `SYNC_REMOTE_MONGO_DB`, or the URI path; the local database uses the same precedence and defaults to `development`. The S3 bucket is required only when S3 syncing is enabled. Missing targets can be selected interactively; noninteractive runs must supply them. Use `--s3-prefix=` to override a configured prefix and sync the whole bucket, or choose `/` at the interactive prefix prompt.
+
+`SYNC_AWS_REGION` overrides both AWS region environment variables. The AWS CLI continues to use its configured credentials/profile.
 
 ## Media URL rewriting
 
@@ -110,3 +119,24 @@ sync-mongo-s3 \
 ```
 
 `--rewrite-media-drop-first-segment` strips the first path segment from the URL before mapping it to `./s3-bucket`. Useful when your CDN path includes a prefix (e.g. `/media/`) that doesn't exist in your local bucket directory.
+
+## Restore behavior
+
+MongoDB restore uses `--drop`, replacing collections present in the dump, and stops on the first restore error. Collections absent from the dump remain in the destination. Restore and media rewriting are not transactional: an error can leave partially restored or rewritten data. Temporary dumps are removed on success and failure unless `--keep-dump` is supplied.
+
+The CLI rejects internal destination databases, unsafe database names, and matching source/destination databases on overlapping configured endpoints. It also recognizes common loopback aliases. Different DNS names can still point at the same server, so check the destination carefully with `--dry-run` before restoring. MongoDB URI authentication settings are preserved when selecting or remapping databases, including SRV TXT authentication settings.
+
+S3 source listing is checked before MongoDB changes begin. This checks access to the selected bucket/prefix without requiring permission to list every bucket in the account. It does not prove download or MongoDB write permissions. S3 sync downloads new and changed files into `./s3-bucket`; it does not delete local files absent from S3. MongoDB and S3 updates are separate operations, so a later failure does not roll back an earlier one.
+
+Media rewriting visits ordinary user collections, preserving BSON values and root document IDs. It skips views, time-series and system collections, and field names that cannot be safely addressed using dotted update paths. Only matching HTTP(S) URLs are rewritten.
+
+## Development
+
+```bash
+pnpm install --frozen-lockfile
+pnpm check
+```
+
+`pnpm check` checks formatting, compiles the CLI, runs regression tests, and checks package contents. `pnpm test` runs the build and tests, `pnpm build` compiles the publishable CLI, and `pnpm format` formats source files. Tests use temporary directories, fake command executables, and mocked MongoDB calls; they do not contact live databases or buckets. CI runs on Node 20.19, 22, and 24.
+
+Releases run from `main` when a commit message contains exactly one `(release:patch)`, `(release:minor)`, or `(release:major)` marker, or through the Release workflow's manual version-increment selection. `pnpm hooks:install` enables local marker validation. A failed npm publication can leave the version commit and tag in Git; check the registry and workflow failure before retrying.

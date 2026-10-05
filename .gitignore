@@ -30,7 +30,9 @@ yarn-debug.log*
 yarn-error.log*
 
 # local env files
-.env*.local
+.env*
+!.env.example
+!.env.sample
 
 # vercel
 .vercel
@@ -38,9 +40,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 
-.env
-
 /dev/media
+
+# downloaded S3 data
+/s3-bucket/
 
 # Playwright
 /test-results/

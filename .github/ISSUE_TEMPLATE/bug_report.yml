@@ -1,6 +1,5 @@
 name: Bug report
-description: Report a reproducible bug in @ggaidelevicius/payload-isr
-title: "bug: "
+description: Report a reproducible bug in @ggaidelevicius/sync-mongo-s3
 labels:
   - bug
 body:
@@ -22,10 +21,10 @@ body:
     id: steps
     attributes:
       label: Steps to reproduce
-      description: Include exact steps and configuration snippets where relevant.
+      description: Include the command and relevant configuration, with credentials removed.
       placeholder: |
-        1. Configure plugin with ...
-        2. Update collection/global ...
+        1. Configure SYNC_* environment variables ...
+        2. Run sync-mongo-s3 with ...
         3. Observe ...
     validations:
       required: true
@@ -50,16 +49,17 @@ body:
     id: package-version
     attributes:
       label: Package version
-      description: Version of @ggaidelevicius/payload-isr
-      placeholder: e.g. 1.0.0
+      description: Version of @ggaidelevicius/sync-mongo-s3
+      placeholder: e.g. 0.1.1
     validations:
       required: true
 
   - type: input
-    id: payload-version
+    id: tool-versions
     attributes:
-      label: Payload version
-      placeholder: e.g. 3.78.0
+      label: External tool versions
+      description: Include AWS CLI and MongoDB Database Tools versions for the affected operation.
+      placeholder: aws --version, mongodump --version, and mongorestore --version
     validations:
       required: true
 
@@ -72,13 +72,14 @@ body:
       required: true
 
   - type: dropdown
-    id: runtime
+    id: operating-system
     attributes:
-      label: Runtime/framework
+      label: Operating system
       options:
-        - Next.js
-        - Other Node.js framework
-        - Unknown
+        - macOS
+        - Linux
+        - Windows
+        - Other
     validations:
       required: true
 

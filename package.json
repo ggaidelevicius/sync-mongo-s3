@@ -13,26 +13,23 @@
     "README.md"
   ],
   "scripts": {
-    "build": "pnpm clean && tsc --outDir dist --rootDir src",
-    "check": "pnpm typecheck",
-    "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
+    "build": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\" && tsc --outDir dist --rootDir src",
+    "check": "prettier --check . && pnpm test",
     "format": "prettier --write .",
-    "format:check": "prettier --check .",
     "hooks:install": "git config core.hooksPath .githooks",
     "prepack": "pnpm build",
-    "test": "pnpm check && pnpm build",
-    "typecheck": "tsc --noEmit"
+    "test": "pnpm build && node --test test/*.test.mjs"
   },
   "dependencies": {
-    "mongodb": "^7.1.0"
+    "mongodb": "^7.7.0"
   },
   "devDependencies": {
-    "@types/node": "^25.4.0",
-    "prettier": "^3.8.1",
-    "typescript": "^5.9.3"
+    "@types/node": "^26.6.4",
+    "prettier": "^3.9.9",
+    "typescript": "^7.0.2"
   },
   "engines": {
-    "node": ">=20.9.0",
+    "node": ">=20.19.0",
     "pnpm": "^9 || ^10"
   },
   "publishConfig": {

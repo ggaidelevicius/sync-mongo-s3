@@ -1,41 +1,38 @@
 import fs from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 
-const commitMsgFile = process.argv[2]
-
-if (!commitMsgFile) {
-  console.error('[sync-mongo-s3] commit-msg validation requires a commit message file path.')
-  process.exit(1)
-}
-
-const message = fs.readFileSync(commitMsgFile, 'utf8')
-
-if (!message.includes('(release')) {
-  process.exit(0)
-}
-
-const allowedMarkers = new Set([
-  '(release:patch)',
-  '(release:minor)',
-  '(release:major)',
+const releaseMarkers = new Map([
+  ['(release:patch)', 'patch'],
+  ['(release:minor)', 'minor'],
+  ['(release:major)', 'major'],
 ])
 
-const foundMarkers = [...message.matchAll(/\(release:[^)]+\)/g)].map((match) => match[0])
-const validMarkers = foundMarkers.filter((marker) => allowedMarkers.has(marker))
-const invalidMarkers = foundMarkers.filter((marker) => !allowedMarkers.has(marker))
+export function getReleaseBump(message) {
+  const markers = message.match(/\(release[^)\r\n]*\)?/g) ?? []
+  if (markers.length === 0) return undefined
 
-const hasValidSingleMarker = validMarkers.length === 1
-const hasInvalidMarkers = invalidMarkers.length > 0
+  if (markers.length !== 1 || !releaseMarkers.has(markers[0])) {
+    throw new Error('Use exactly one of: (release:patch), (release:minor), (release:major).')
+  }
 
-if (hasValidSingleMarker && !hasInvalidMarkers) {
-  process.exit(0)
+  return releaseMarkers.get(markers[0])
 }
 
-console.error('[payload-isr] Invalid release marker in commit message.')
-console.error(
-  '[sync-mongo-s3] Use exactly one of: (release:patch), (release:minor), (release:major).',
-)
-if (foundMarkers.length > 0) {
-  console.error(`[sync-mongo-s3] Found markers: ${foundMarkers.join(', ')}`)
-}
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  try {
+    const commitMsgFile = process.argv[2]
+    if (!commitMsgFile) {
+      throw new Error('Commit message validation requires a commit message file path.')
+    }
 
-process.exit(1)
+    const bump = getReleaseBump(fs.readFileSync(commitMsgFile, 'utf8'))
+    if (process.argv.includes('--release')) {
+      if (!bump) throw new Error('A release commit must include a release marker.')
+      console.log(bump)
+    }
+  } catch (error) {
+    console.error(`[sync-mongo-s3] ${error.message}`)
+    process.exitCode = 1
+  }
+}

@@ -1,13 +1,12 @@
 name: Feature request
-description: Suggest an enhancement for @ggaidelevicius/payload-isr
-title: "feat: "
+description: Suggest an enhancement for @ggaidelevicius/sync-mongo-s3
 labels:
   - enhancement
 body:
   - type: markdown
     attributes:
       value: |
-        Describe the use case first, then the API shape you expect.
+        Describe the use case first, then the CLI behavior you expect.
 
   - type: textarea
     id: problem
@@ -22,8 +21,8 @@ body:
     id: proposal
     attributes:
       label: Proposed solution
-      description: Suggest API changes or behavior.
-      placeholder: e.g. add option X with shape Y
+      description: Suggest CLI options or behavior.
+      placeholder: e.g. add a flag to control ...
     validations:
       required: true
 

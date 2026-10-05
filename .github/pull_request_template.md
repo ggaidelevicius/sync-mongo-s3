@@ -14,8 +14,7 @@
 
 ## Validation
 
-- [ ] `pnpm test:int`
-- [ ] `pnpm build`
+- [ ] `pnpm check` (formatting, build, tests, and package contents)
 
 ## Release impact
 
@@ -28,4 +27,3 @@
 
 - [ ] I updated docs where needed.
 - [ ] I considered backward compatibility.
-- [ ] I verified publish scripts still pass (`pnpm publish:check`).
